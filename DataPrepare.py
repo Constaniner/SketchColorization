@@ -1,7 +1,8 @@
 import os
-
+import json
+import numpy as np
+import torch
 from PIL import Image
-
 from torchvision import transforms
 from torch.utils.data import Dataset
 
@@ -9,7 +10,7 @@ class InputData(Dataset):
     """
     Style & Sketch
     """
-    def __init__(self, datadir='./data', mode='train',transform=None, colorhisto=False, size=500):
+    def __init__(self, datadir='./data', mode='train',transform=None, colorhisto=True, size=500):
         """
         :param datadir: data directory
         :param mode: train / validate
@@ -37,10 +38,36 @@ class InputData(Dataset):
         filepath = self.datadir + '/' + file
         filename = os.path.splitext(file)[0]
 
-        # TODO: Implement this!
+
         ColorHistogram = None
         if self.colorhisto:
-            pass
+            with open(('./data/colorgram/' + filename +'.json'),'r') as colorhisto_file:
+                colorh = json.loads(colorhisto_file.read())
+            # Make colorgram to sensor
+            colors = list(colorh.values())
+            topnum = len(colors[0].keys())
+            tensor = np.ones([topnum*3, self.size, self.size])
+
+            h = self.size // 4
+            for i in range(len(colors)):
+                hi = h * i
+                color = colors[i]
+                for j in range(1, topnum + 1):
+                    r, g, b = color[str(j)]
+
+                    # assign index
+                    red = (j - 1) * 3
+                    green = (j - 1) * 3 + 1
+                    blue = (j - 1) * 3 + 2
+
+                    # assign values
+                    tensor[red, hi:hi + h] *= r
+                    tensor[green, hi:hi + h] *= g
+                    tensor[blue, hi:hi + h] *= b
+
+            tensor = torch.from_numpy(tensor.copy())
+            # TODO: Scale?
+            ColorHistogram = (tensor / 255.)
 
         # Get Original Image and Sketch
         image = Image.open(filepath)
